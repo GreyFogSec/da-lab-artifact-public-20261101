@@ -1,0 +1,70 @@
+name: server-artifact-name-validation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/server-artifact-name-validation.yml'
+      - 'probes/artifact-name-server.mjs'
+      - 'probes/inspect-download-boundary.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+jobs:
+  producer:
+    name: server name acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install exact artifact client
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Probe bounded artifact-name corpus
+        run: node probes/artifact-name-server.mjs
+      - name: Upload sanitized server result
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-name-results
+          path: probe-results/server-name-validation.json
+          retention-days: 5
+
+  download-boundary:
+    name: server-name download boundary (${{ matrix.os }})
+    needs: producer
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare intended download boundary
+        run: node -e "const fs=require('fs');fs.mkdirSync('sandbox/incoming',{recursive:true});fs.writeFileSync('sandbox/protected.txt','protected-sentinel')"
+      - name: Download every finalized artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          path: sandbox/incoming
+      - name: Inspect boundary
+        if: always()
+        env:
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+        run: node probes/inspect-download-boundary.mjs
+      - name: Upload sanitized download result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-name-download-${{ runner.os }}
+          path: probe-results/download-boundary-*.json
+          retention-days: 5
+
