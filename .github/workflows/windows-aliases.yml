@@ -1,0 +1,168 @@
+name: windows-filesystem-aliases
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  produce-linux-filenames:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Create bounded filename corpus
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const cases = [
+            ['trailing-dot', 'victim.txt.', 'payload-trailing-dot\n'],
+            ['trailing-space', 'victim.txt ', 'payload-trailing-space\n'],
+            ['ads-default', 'victim.txt::$DATA', 'payload-ads-default\n'],
+            ['ads-named', 'victim.txt:canary', 'payload-ads-named\n'],
+            ['case-fold', 'VICTIM.TXT', 'payload-case-fold\n']
+          ]
+          for (const [id, name, content] of cases) {
+            const dir = `aliases/${id}`
+            fs.mkdirSync(dir, {recursive: true})
+            fs.writeFileSync(`${dir}/${name}`, content)
+          }
+          NODE
+
+      - name: Upload trailing-dot ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alias-trailing-dot
+          path: aliases/trailing-dot/
+          retention-days: 1
+
+      - name: Upload trailing-space ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alias-trailing-space
+          path: aliases/trailing-space/
+          retention-days: 1
+
+      - name: Upload default-stream ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alias-ads-default
+          path: aliases/ads-default/
+          retention-days: 1
+
+      - name: Upload named-stream ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alias-ads-named
+          path: aliases/ads-named/
+          retention-days: 1
+
+      - name: Upload case-fold ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: alias-case-fold
+          path: aliases/case-fold/
+          retention-days: 1
+
+  consume-aliases:
+    needs: produce-linux-filenames
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 7
+    steps:
+      - name: Seed protected-looking base files
+        shell: bash
+        run: |
+          for dir in trailing-dot trailing-space ads-default ads-named case-fold; do
+            mkdir -p "out/$dir"
+            printf 'protected-before\n' > "out/$dir/victim.txt"
+          done
+
+      - name: Extract trailing-dot entry
+        id: trailing_dot
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: alias-trailing-dot
+          path: out/trailing-dot
+
+      - name: Extract trailing-space entry
+        id: trailing_space
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: alias-trailing-space
+          path: out/trailing-space
+
+      - name: Extract default-stream entry
+        id: ads_default
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: alias-ads-default
+          path: out/ads-default
+
+      - name: Extract named-stream entry
+        id: ads_named
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: alias-ads-named
+          path: out/ads-named
+
+      - name: Extract case-fold entry
+        id: case_fold
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: alias-case-fold
+          path: out/case-fold
+
+      - name: Inventory aliases and protected base hashes
+        shell: bash
+        env:
+          TRAILING_DOT: ${{ steps.trailing_dot.outcome }}
+          TRAILING_SPACE: ${{ steps.trailing_space.outcome }}
+          ADS_DEFAULT: ${{ steps.ads_default.outcome }}
+          ADS_NAMED: ${{ steps.ads_named.outcome }}
+          CASE_FOLD: ${{ steps.case_fold.outcome }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const crypto = require('crypto')
+          const hashFile = file => {
+            try { return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') }
+            catch (error) { return `error:${error.code || error.name}` }
+          }
+          const cases = ['trailing-dot', 'trailing-space', 'ads-default', 'ads-named', 'case-fold']
+          const result = {
+            platform: process.platform,
+            outcomes: {
+              trailingDot: process.env.TRAILING_DOT,
+              trailingSpace: process.env.TRAILING_SPACE,
+              adsDefault: process.env.ADS_DEFAULT,
+              adsNamed: process.env.ADS_NAMED,
+              caseFold: process.env.CASE_FOLD
+            },
+            protectedBeforeSha256: crypto.createHash('sha256').update('protected-before\n').digest('hex'),
+            cases: cases.map(id => ({
+              id,
+              directoryEntries: fs.readdirSync(path.join('out', id)).sort(),
+              baseSha256: hashFile(path.join('out', id, 'victim.txt')),
+              namedStreamSha256: id === 'ads-named' ? hashFile(path.join('out', id, 'victim.txt:canary')) : null
+            }))
+          }
+          fs.mkdirSync('evidence', {recursive: true})
+          fs.writeFileSync('evidence/windows-aliases.json', JSON.stringify(result, null, 2) + '\n')
+          NODE
+
+      - name: Upload sanitized alias evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: windows-aliases-${{ runner.os }}
+          path: evidence/windows-aliases.json
+          retention-days: 7
