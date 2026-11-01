@@ -1,0 +1,6 @@
+name: Digest service probe
+description: Lab-only artifact digest metadata probe
+runs:
+  using: node24
+  main: index.mjs
+

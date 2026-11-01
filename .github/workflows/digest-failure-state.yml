@@ -1,0 +1,85 @@
+name: digest-failure-state
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/digest-failure-state.yml'
+      - 'digest-probes/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  producer:
+    name: produce digest variants
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install exact artifact client
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Create bounded digest variants
+        uses: ./digest-probes/service-action
+      - name: Upload service result
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-service-result
+          path: digest-results/service-validation.json
+          retention-days: 5
+
+  consumer:
+    name: verify digest outcomes and filesystem state
+    needs: producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Valid digest control
+        id: valid
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: digest-valid-${{ github.run_id }}
+          path: digest-sandbox/valid
+      - name: Missing digest
+        id: missing
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: digest-missing-${{ github.run_id }}
+          path: digest-sandbox/missing
+      - name: Wrong digest default error
+        id: wrong
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: digest-wrong-${{ github.run_id }}
+          path: digest-sandbox/wrong
+      - name: Malformed digest default error
+        id: malformed
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: digest-malformed-${{ github.run_id }}
+          path: digest-sandbox/malformed
+      - name: Record sanitized outcomes
+        if: always()
+        env:
+          OUTCOME_VALID: ${{ steps.valid.outcome }}
+          OUTCOME_MISSING: ${{ steps.missing.outcome }}
+          OUTCOME_WRONG: ${{ steps.wrong.outcome }}
+          OUTCOME_MALFORMED: ${{ steps.malformed.outcome }}
+        run: node digest-probes/inspect.mjs
+      - name: Upload sanitized outcome evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-download-outcomes
+          path: digest-results/download-outcomes.json
+          retention-days: 5
+
