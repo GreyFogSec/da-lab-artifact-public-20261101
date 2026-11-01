@@ -1,0 +1,124 @@
+name: concurrency-collision
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/concurrency-collision.yml'
+      - 'collision-probes/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  producer:
+    name: produce collision corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install exact artifact client
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Create twelve bounded artifacts
+        uses: ./collision-probes/service-action
+      - name: Upload expected-hash metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: collision-metadata
+          path: collision-evidence/service-validation.json
+          retention-days: 5
+
+  consumer:
+    name: repeat merged collision downloads
+    needs: producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download expected-hash metadata
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: collision-metadata
+          path: collision-meta
+      - name: Collision download iteration 1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/1
+
+      - name: Collision download iteration 2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/2
+
+      - name: Collision download iteration 3
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/3
+
+      - name: Collision download iteration 4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/4
+
+      - name: Collision download iteration 5
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/5
+
+      - name: Collision download iteration 6
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/6
+
+      - name: Collision download iteration 7
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/7
+
+      - name: Collision download iteration 8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/8
+
+      - name: Collision download iteration 9
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/9
+
+      - name: Collision download iteration 10
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: collision-*
+          merge-multiple: true
+          path: collision-results/10
+      - name: Classify output hashes
+        run: node collision-probes/inspect.mjs
+      - name: Upload sanitized collision evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: collision-outcomes
+          path: collision-evidence/outcomes.json
+          retention-days: 5
+

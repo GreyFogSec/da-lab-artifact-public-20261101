@@ -1,0 +1,6 @@
+name: Collision artifact producer
+description: Lab-only bounded collision corpus producer
+runs:
+  using: node24
+  main: index.mjs
+
