@@ -1,0 +1,33 @@
+name: artifact-name-boundary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/artifact-name-boundary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  supported-upload-rejection-control:
+    name: supported upload rejection control
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create bounded artifact payload
+        run: |
+          mkdir -p payload-malicious
+          printf '%s' 'untrusted-artifact-canary' > payload-malicious/protected.txt
+      - name: Upload dot-dot artifact through supported action
+        id: dotdot
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ..
+          path: payload-malicious/protected.txt
+          retention-days: 5
+      - name: Verify GitHub service rejects dot-dot name
+        run: |
+          test '${{ steps.dotdot.outcome }}' = 'failure'
+          printf '%s\n' 'server_rejected_exact_dotdot=true'
+
