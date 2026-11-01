@@ -1,0 +1,10 @@
+{
+  "name": "da-lab-filesystem-probes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@actions/artifact": "6.3.1"
+  }
+}
+

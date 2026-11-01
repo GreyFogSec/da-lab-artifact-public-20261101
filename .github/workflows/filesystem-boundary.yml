@@ -1,0 +1,40 @@
+name: filesystem-boundary-matrix
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/filesystem-boundary.yml'
+      - 'probes/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  filesystem-boundary:
+    name: filesystem-boundary (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install exact artifact client
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Probe path normalization
+        run: node probes/windows-path-normalization.mjs
+      - name: Upload sanitized probe result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: path-normalization-${{ runner.os }}
+          path: probe-results/*.json
+          if-no-files-found: warn
+          retention-days: 5
+
