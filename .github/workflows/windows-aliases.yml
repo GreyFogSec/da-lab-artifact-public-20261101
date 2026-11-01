@@ -44,6 +44,7 @@ jobs:
           retention-days: 1
 
       - name: Upload default-stream ZIP
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: alias-ads-default
@@ -51,6 +52,7 @@ jobs:
           retention-days: 1
 
       - name: Upload named-stream ZIP
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: alias-ads-named
@@ -63,6 +65,12 @@ jobs:
           name: alias-case-fold
           path: aliases/case-fold/
           retention-days: 1
+
+      - name: Install exact artifact client for server-validation probe
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Submit colon-entry ZIPs directly to artifact service
+        run: node probes/windows-alias-service.mjs
 
   consume-aliases:
     needs: produce-linux-filenames
