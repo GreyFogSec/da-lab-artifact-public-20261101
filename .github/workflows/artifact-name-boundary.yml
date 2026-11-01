@@ -1,0 +1,97 @@
+name: artifact-name-boundary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/artifact-name-boundary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  producer:
+    name: producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create bounded artifact payloads
+        run: |
+          mkdir -p payload-malicious payload-benign
+          printf '%s' 'untrusted-artifact-canary' > payload-malicious/protected.txt
+          printf '%s' 'benign-artifact' > payload-benign/benign.txt
+      - name: Upload dot-dot artifact through supported action
+        uses: actions/upload-artifact@v7
+        with:
+          name: ..
+          path: payload-malicious/protected.txt
+          retention-days: 5
+      - name: Upload second artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: benign
+          path: payload-benign/benign.txt
+          retention-days: 5
+
+  multi-artifact-boundary:
+    name: multi-artifact boundary
+    needs: producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prepare intended boundary and protected sibling
+        run: |
+          mkdir -p sandbox/incoming
+          printf '%s' 'protected-sentinel' > sandbox/protected.txt
+      - name: Download all artifacts with default directory separation
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          path: sandbox/incoming
+      - name: Verify boundary result
+        run: |
+          test "$(cat sandbox/protected.txt)" = 'untrusted-artifact-canary'
+          test -f sandbox/incoming/benign/benign.txt
+          test ! -e sandbox/incoming/protected.txt
+          {
+            printf 'outside_boundary_write=true\n'
+            printf 'producer_artifact_name=..\n'
+            printf 'download_mode=all,merge-multiple:false\n'
+            shasum -a 256 sandbox/protected.txt
+          } | tee boundary-result.txt
+      - name: Upload sanitized boundary evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: boundary-result
+          path: boundary-result.txt
+          retention-days: 5
+
+  single-artifact-control:
+    name: single-artifact negative control
+    needs: producer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prepare control boundary
+        run: |
+          mkdir -p control/incoming
+          printf '%s' 'control-sentinel' > control/protected.txt
+      - name: Download dot-dot artifact by exact name
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: ..
+          path: control/incoming
+      - name: Verify single-artifact containment
+        run: |
+          test "$(cat control/protected.txt)" = 'control-sentinel'
+          test "$(cat control/incoming/protected.txt)" = 'untrusted-artifact-canary'
+          {
+            printf 'outside_boundary_write=false\n'
+            printf 'download_mode=single-name\n'
+            shasum -a 256 control/incoming/protected.txt
+          } | tee single-control-result.txt
+      - name: Upload sanitized control evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: single-control-result
+          path: single-control-result.txt
+          retention-days: 5
+
