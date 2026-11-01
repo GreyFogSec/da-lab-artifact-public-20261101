@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
+      - name: Checkout trusted probe code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
       - name: Create bounded filename corpus
         run: |
           node <<'NODE'
