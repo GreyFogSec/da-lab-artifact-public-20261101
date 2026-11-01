@@ -1,0 +1,32 @@
+name: baseline
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record non-secret event identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTOR: ${{ github.actor }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p evidence
+          printf 'event=%s\nactor=%s\nsha=%s\nrun_id=%s\n' \
+            "$EVENT_NAME" "$EVENT_ACTOR" "$EVENT_SHA" "$EVENT_RUN_ID" > evidence/identity.txt
+      - name: Upload bounded identity artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: baseline-identity
+          path: evidence/identity.txt
+          retention-days: 3
+
