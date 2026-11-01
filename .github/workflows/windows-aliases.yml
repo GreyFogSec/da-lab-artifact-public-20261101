@@ -75,7 +75,7 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Submit colon-entry ZIPs directly to artifact service
-        run: node probes/windows-alias-service.mjs
+        uses: ./probes/windows-alias-service-action
 
   consume-aliases:
     needs: produce-linux-filenames
