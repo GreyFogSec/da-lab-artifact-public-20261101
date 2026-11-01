@@ -24,7 +24,7 @@ jobs:
       - name: Install exact artifact client
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Probe bounded artifact-name corpus
-        run: node probes/artifact-name-server.mjs
+        uses: ./probes/server-name-action
       - name: Upload sanitized server result
         uses: actions/upload-artifact@v7
         with:

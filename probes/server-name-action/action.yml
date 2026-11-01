@@ -1,0 +1,6 @@
+name: Server artifact-name validation probe
+description: Authorized lab-only probe using the job-scoped artifact runtime token
+runs:
+  using: node24
+  main: index.mjs
+
