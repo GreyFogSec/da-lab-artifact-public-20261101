@@ -1,0 +1,5 @@
+name: Windows alias artifact service probe
+description: Runs the bounded direct artifact-service probe with job runtime credentials
+runs:
+  using: node24
+  main: index.mjs
